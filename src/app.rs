@@ -1,11 +1,54 @@
+use crate::app::components::type_area::TypeArea;
+use components::chat_area::ChatArea;
 use leptos::*;
 use leptos_meta::*;
-use leptos_router::*;
+
+mod components;
+
+use crate::{
+    api::converse,
+    model::conversation::{Conversation, Message},
+};
 
 #[component]
 pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
+
+    let (conversation, set_conversation) = create_signal(Conversation::new());
+
+    let send = create_action(move |new_message: &String| {
+        let user_message = Message {
+            text: new_message.clone(),
+            user: true,
+        };
+        set_conversation.update(move |c| {
+            c.messages.push(user_message);
+        });
+
+        converse(conversation.get())
+    });
+
+    create_effect(move |_| {
+        if let Some(_) = send.input().get() {
+            let model_message = Message {
+                text: String::from("..."),
+                user: false,
+            };
+
+            set_conversation.update(move |c| {
+                c.messages.push(model_message);
+            });
+        }
+    });
+
+    create_effect(move |_| {
+        if let Some(Ok(response)) = send.value().get() {
+            set_conversation.update(move |c| {
+                c.messages.last_mut().unwrap().text = response;
+            });
+        }
+    });
 
     view! {
         // injects a stylesheet into the document <head>
@@ -13,30 +56,9 @@ pub fn App() -> impl IntoView {
         <Stylesheet id="leptos" href="/pkg/rust-chat.css"/>
 
         // sets the document title
-        <Title text="Welcome to Leptos"/>
-
-        // content for this welcome page
-        <Router>
-            <main>
-                <Routes>
-                    <Route path="" view=HomePage/>
-                    <Route path="/*any" view=NotFound/>
-                </Routes>
-            </main>
-        </Router>
-    }
-}
-
-/// Renders the home page of your application.
-#[component]
-fn HomePage() -> impl IntoView {
-    // Creates a reactive value to update the button
-    let (count, set_count) = create_signal(0);
-    let on_click = move |_| set_count.update(|count| *count += 1);
-
-    view! {
-        <h1>"Welcome to Leptos!"</h1>
-        <button on:click=on_click>"Click Me: " {count}</button>
+        <Title text="Rust Chatbox"/>
+        <ChatArea conversation />
+        <TypeArea send />
     }
 }
 
